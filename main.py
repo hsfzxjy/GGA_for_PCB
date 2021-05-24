@@ -51,8 +51,24 @@ class GA(pygad.GA):
         # return super().single_point_crossover(parents, offspring_size)
 
     def random_mutation(self, offsprings: np.ndarray):
+        mutation_probability = self.mutation_percent_genes / 100
+
         offsprings = list(map(lambda gene: Solution.decode(problem, gene), offsprings))
-        ...  # TODO: do mutations on offsprings
+
+        for offspring in offsprings:
+            # p-mutation
+            if np.random.rand() > mutation_probability: continue
+
+            # randomly choose a board, then assign it to a random machine
+            board_id = np.random.randint(problem.n)
+            offspring.x[board_id, :] = 0
+            offspring.x[board_id, np.random.randint(problem.m)] = 1
+
+            # randomly choose a machine, then shuffle the orders of assigned boards
+            machine_id = np.random.randint(problem.m)
+            shuflle_idx = (offspring.x.argmax(axis=1) == machine_id)
+            offspring.order[shuflle_idx] = np.random.permutation(offspring.order[shuflle_idx])
+        
         offsprings = np.stack([x.encode() for x in offsprings], axis=0)
         return offsprings
 

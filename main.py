@@ -287,31 +287,32 @@ if __name__ == "__main__":
         lambda2=0.2,
         lambda3=0.6,
     )
+
+    # Survey
+    ga_survey_instance = GGA(
+        num_generations=ggaparameters.Gs,
+        num_parents_mating=ggaparameters.Ps,
+        fitness_func=fitness_func,
+        sol_per_pop=ggaparameters.Ps,
+        num_genes=problem.n * 2,
+        init_range_low=0,
+        init_range_high=1,
+        keep_parents=0,
+        mutation_percent_genes=ggaparameters.Pm * 100,
+        save_best_solutions=False,
+    )
+    ga_survey_instance.gga_run()
+
+    # select best Pe from survey result
+    Pe = ggaparameters.Pe
+    survey_pop = ga_survey_instance.population
+    survey_fit = ga_survey_instance.last_generation_fitness
+    init_pop = survey_pop[survey_fit.argsort()[::-1][:Pe]]
+
     import matplotlib.pyplot as plt
     fig = plt.figure()
-    for Ps in np.arange(20, 101, 10):
-        ggaparameters.Ps = int(Ps)
-        # Survey
-        ga_survey_instance = GGA(
-            num_generations=ggaparameters.Gs,
-            num_parents_mating=ggaparameters.Ps,
-            fitness_func=fitness_func,
-            sol_per_pop=ggaparameters.Ps,
-            num_genes=problem.n * 2,
-            init_range_low=0,
-            init_range_high=1,
-            keep_parents=0,
-            mutation_percent_genes=ggaparameters.Pm * 100,
-            save_best_solutions=False,
-        )
-        ga_survey_instance.gga_run()
-
-        # select best Pe from survey result
-        Pe = ggaparameters.Pe
-        survey_pop = ga_survey_instance.population
-        survey_fit = ga_survey_instance.last_generation_fitness
-        init_pop = survey_pop[survey_fit.argsort()[::-1][:Pe]]
-
+    for Ge in np.arange(20, 201, 20):
+        ggaparameters.Ge = int(Ge)
         ggaparameters.alpha = 0.4
         ga_instance = GGA(
             num_generations=ggaparameters.Ge,
@@ -324,7 +325,7 @@ if __name__ == "__main__":
             save_best_solutions=False,
         )
         ga_instance.gga_run()
-        plt.plot(ga_instance.best_solutions_fitness, label='$P_s=%d$' % Ps)
+        plt.plot(ga_instance.best_solutions_fitness, label='$G_e=%d$' % Ge)
 
     plt.legend()
     plt.title("$n=%d$ Iteration vs. Fitness" % problem.n)

@@ -21,8 +21,8 @@ class GGAParameters:
     # Number of evolution generations
     # Stopping condition: when the number of iterations reaches Ge
     # Ge = 50
-    Ge = 500
-    
+    Ge = 50
+
     # will be selected based on the experiments, [0,1], 0.3
     alpha = 0.3
 
@@ -38,10 +38,10 @@ def fitness_func(gene: np.ndarray, _: int) -> float:
 class GGA(pygad.GA):
     """
     A DIRTY modification to support customized crossover / mutation.
-    
+
     Since pygad provides no way for customizing genetic operations, we override certain built-in
-    functions to achieve the goal. 
-    
+    functions to achieve the goal.
+
     NOTE that the name of the functions below will not match their behaviors. Simply
     fill the lines marked with TODO.
 
@@ -50,12 +50,12 @@ class GGA(pygad.GA):
 
     Since pygad does not support custom type as gene, we turn to use a 2n-sized array to
     represent a gene. When recieving a gene from pygad, use `Solution.decode()` to translate
-    it into a Solution instance; before returning some Solutions back to pygad, use 
+    it into a Solution instance; before returning some Solutions back to pygad, use
     `solution.encode()` to translate them back to 2n-sized arrays.
 
     See comments in class Solution definition for details of its members.
     """
-    
+
     def gga_atc_crossover(self, parent: np.ndarray):
         """
         Asexual transposition crossover (ATC) for binary sequence crossover
@@ -76,7 +76,7 @@ class GGA(pygad.GA):
             newb[np.arange(gene_start+shift,gene_end+shift+1)%newb.shape[0]] = b[np.arange(gene_start,gene_end+1)%b.shape[0]]
             newb[np.arange(gene_start,gene_start+shift)%newb.shape[0]] = b[np.arange(gene_end+1,gene_end+1+shift)%b.shape[0]]
             return newb
-        
+
         b = parent.x.T.reshape(-1)
         nb = atc(b)
         # check & fix nb
@@ -92,7 +92,7 @@ class GGA(pygad.GA):
         offspring.x = x
         return offspring
 
-    
+
     def gga_wrc_crossover(self, p1: np.ndarray, p2: np.ndarray):
         # TODO: bottleneck, to be optimized
         def neibor(sol, k):
@@ -116,7 +116,7 @@ class GGA(pygad.GA):
                 prev_job = sol.problem.A[:,prev_jobid].reshape(-1)
             else:
                 prev_job = np.array([0] * sol.problem.p)
-            
+
             return prev_job, job, next_job
 
         def weight(sol, k):
@@ -138,7 +138,7 @@ class GGA(pygad.GA):
         sizes = p.x.sum(axis=0)
         bins = np.split(ind, np.cumsum(sizes)[:-1])
         for t in range(len(bins)):
-            x[bins[t],t] = 1        
+            x[bins[t],t] = 1
         order = np.zeros((problem.n,), dtype=np.int32)
         order[ind] = range(problem.n)
 
@@ -188,7 +188,7 @@ class GGA(pygad.GA):
             machine_id = np.random.randint(problem.m)
             shuflle_idx = (offspring.x.argmax(axis=1) == machine_id)
             offspring.order[shuflle_idx] = np.random.permutation(offspring.order[shuflle_idx])
-        
+
         offsprings = np.stack([x.encode() for x in offsprings], axis=0)
         return offsprings
 
@@ -232,7 +232,7 @@ class GGA(pygad.GA):
             n_survive = int(survive_ratio * self.num_parents_mating)
             n_children = self.num_parents_mating - n_survive
             self.last_survive = self.rank_selection(self.last_generation_fitness, num_parents=n_survive)
-            
+
             # GGA: Selecting the best parents in the population for mating.
             #      These selected parents are expected to generate n_children children
             # TODO: in the rest, not in the original population
@@ -243,7 +243,7 @@ class GGA(pygad.GA):
             # GGA: Generating offspring using crossover.
             self.last_generation_offspring_crossover = self.crossover(self.last_generation_parents,
                                                     offspring_size=(n_children, self.num_genes))
-            
+
             # Adding some variations to the offspring using mutation.
             self.last_generation_offspring_mutation = self.mutation(self.last_generation_offspring_crossover)
 
@@ -271,7 +271,7 @@ class GGA(pygad.GA):
 
 if __name__ == "__main__":
     np.random.seed(43)
-    n = 100
+    n = 30
     m = 3
     p = 100
     A = (np.random.rand(p, n) > 0.5).astype(np.int32)
@@ -309,21 +309,25 @@ if __name__ == "__main__":
     survey_fit = ga_survey_instance.last_generation_fitness
     init_pop = survey_pop[survey_fit.argsort()[::-1][:Pe]]
 
-    ga_instance = GGA(
-        num_generations=ggaparameters.Ge,
-        num_parents_mating=ggaparameters.Pe,
-        fitness_func=fitness_func,
-        initial_population=init_pop,
-        num_genes=problem.n * 2,
-        init_range_low=0,
-        init_range_high=1,
-        keep_parents=1,
-        mutation_percent_genes=ggaparameters.Pm * 100,
-        save_best_solutions=True,
-    )
-    ga_instance.gga_run()
-    ga_instance.plot_result()
+    import matplotlib.pyplot as plt
+    fig = plt.figure()
+    for alpha in np.arange(0.1, 0.9, 0.1):
+        ggaparameters.alpha = alpha
+        ga_instance = GGA(
+            num_generations=ggaparameters.Ge,
+            num_parents_mating=ggaparameters.Pe,
+            fitness_func=fitness_func,
+            initial_population=init_pop,
+            num_genes=problem.n * 2,
+            keep_parents=1,
+            mutation_percent_genes=ggaparameters.Pm * 100,
+            save_best_solutions=False,
+        )
+        ga_instance.gga_run()
+        plt.plot(ga_instance.best_solutions_fitness, label='$\\alpha=%.1f$' % alpha)
 
-    best_sol_genid = ga_instance.best_solution_generation
-    best_gene = ga_instance.best_solutions[best_sol_genid]
-    print(Solution.decode(problem, best_gene).f)
+    plt.legend()
+    plt.title("$n=%d$ Iteration vs. Fitness" % problem.n)
+    plt.xlabel("Generation")
+    plt.ylabel("Fitness")
+    plt.show()

@@ -203,7 +203,8 @@ class GGA(pygad.GA):
         import numpy
 
         self.mutation = self.gga_mutation
-        self.crossover = self.gga_crossover
+        if self.crossover is None:
+            self.crossover = self.gga_crossover
         self.select_parents = self.roulette_wheel_selection
 
         # GGA: survive_ratio = \alpha when not in SURVEY stage
@@ -274,6 +275,7 @@ if __name__ == "__main__":
     ns = []
     result1 = []
     result2 = []
+    result3 = []
     for n in np.arange(20, 101, 10):
         ns.append(int(n))
         n = int(n)
@@ -336,41 +338,61 @@ if __name__ == "__main__":
         print(solution.QI)
         result1.append(solution.QI)
 
-        # Native GA
-        ga_native = GGA(
-            num_generations=ggaparameters.Gs + ggaparameters.Ge,
+        # GGA2
+        ga_spc = GGA(
+            num_generations=ggaparameters.Ge,
             num_parents_mating=ggaparameters.Pe,
             fitness_func=fitness_func,
-            sol_per_pop=ggaparameters.Pe,
+            initial_population=init_pop,
             num_genes=problem.n * 2,
             init_range_low=0,
             init_range_high=1,
             keep_parents=0,
-            crossover_type="single_point",
-            crossover_probability=ggaparameters.Pc,
-            mutation_type="random",
-            mutation_probability=ggaparameters.Pm,
-            parent_selection_type="rws",
             mutation_percent_genes=ggaparameters.Pm * 100,
             save_best_solutions=True,
+            crossover_type="single_point"
         )
+        ga_spc.gga_run()
 
-        ga_native.run()
-        best_sol_genid = ga_native.best_solution_generation
-        best_gene = ga_native.best_solutions[best_sol_genid]
+        best_sol_genid = ga_spc.best_solution_generation
+        best_gene = ga_spc.best_solutions[best_sol_genid]
         solution = Solution.decode(problem, best_gene)
-        # ga_native.plot_result()
         print(solution.f3)
         print(solution.QI)
         result2.append(solution.QI)
+
+        # GGA3
+        ga_mpc = GGA(
+            num_generations=ggaparameters.Ge,
+            num_parents_mating=ggaparameters.Pe,
+            fitness_func=fitness_func,
+            initial_population=init_pop,
+            num_genes=problem.n * 2,
+            init_range_low=0,
+            init_range_high=1,
+            keep_parents=0,
+            mutation_percent_genes=ggaparameters.Pm * 100,
+            save_best_solutions=True,
+            crossover_type="two_points"
+        )
+        ga_mpc.gga_run()
+
+        best_sol_genid = ga_mpc.best_solution_generation
+        best_gene = ga_mpc.best_solutions[best_sol_genid]
+        solution = Solution.decode(problem, best_gene)
+        print(solution.f3)
+        print(solution.QI)
+        result3.append(solution.QI)
     print(ns)
     print(result1)
     print(result2)
+    print(result3)
 
     import matplotlib.pyplot as plt
     fig = plt.figure()
-    plt.plot(ns, result1, label='GGA')
-    plt.plot(ns, result2, label='GA')
+    plt.plot(ns, result1, label='GGA (WRC)')
+    plt.plot(ns, result2, label='GGA (SPC)')
+    plt.plot(ns, result3, label='GGA (TPC)')
     plt.legend()
     plt.xlabel("n (Problem Size)")
     plt.ylabel("QI")
@@ -378,7 +400,8 @@ if __name__ == "__main__":
     plt.show()
 
     """
-    ns = [20, 30, 40, 50, 60, 70, 80, 90, 100]
-    result1 = [0.5784418356456776, 0.6007246376811595, 0.6108764519535375, 0.5783284334313314, 0.5632104719255943, 0.569472764346053, 0.4573074908328968, 0.4506912442396313, 0.47843693055274344]
-    result2 = [0.5400213447171824, 0.5702898550724638, 0.5966209081309398, 0.5543889122217556, 0.5301412332070272, 0.515292746868628, 0.43452069146149813, 0.4368663594470046, 0.46385908078558413]
+    [20, 30, 40, 50, 60, 70, 80, 90, 100]
+    [0.5720384204909285, 0.6015569709837226, 0.6253203485392107, 0.6197654941373535, 0.537037037037037, 0.4680534918276374, 0.45876946642838906, 0.46241830065359474, 0.5589198036006546]
+    [0.5112059765208111, 0.6036801132342534, 0.5545873910814967, 0.5871021775544389, 0.4919636617749825, 0.4101040118870728, 0.4204748532039826, 0.39309056956115773, 0.5147299509001637]
+    [0.5112059765208111, 0.5739561217268224, 0.5607380830343414, 0.5921273031825797, 0.4825296995108316, 0.4404160475482912, 0.4235384222619351, 0.4140989729225023, 0.49018003273322425]
     """

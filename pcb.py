@@ -45,6 +45,14 @@ class Problem:
     def SIZE(self) -> np.ndarray:
         return self.A.sum(axis=0)
 
+    @functools.cached_property
+    def LB(self) -> float:
+        return (self.S * self.n + self.s * self.p) / self.m
+
+    @functools.cached_property
+    def UB(self) -> float:
+        return (self.S * self.n + self.SIZE.sum() * self.s) / self.m
+
 
 @dataclasses.dataclass
 class Solution:
@@ -209,6 +217,10 @@ class Solution:
     def f(self) -> float:
         pr = self.problem
         return pr.lambda1 * self.f1 + pr.lambda2 * self.f2 + pr.lambda3 * self.f3
+
+    @functools.cached_property
+    def QI(self) -> float:
+        return float((self.problem.UB - self.f3) / (self.problem.UB - self.problem.LB))
 
 
 if __name__ == '__main__':

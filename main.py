@@ -9,7 +9,7 @@ import copy
 @dataclasses.dataclass
 class GGAParameters:
     # Survey population size
-    Ps = 100
+    Ps = 50
     # Evolution population size
     Pe = 20
     # Probability of mutation
@@ -21,10 +21,10 @@ class GGAParameters:
     # Number of evolution generations
     # Stopping condition: when the number of iterations reaches Ge
     # Ge = 50
-    Ge = 50
+    Ge = 160
 
     # will be selected based on the experiments, [0,1], 0.3
-    alpha = 0.3
+    alpha = 0.4
 
 ggaparameters = GGAParameters()
 
@@ -271,64 +271,114 @@ class GGA(pygad.GA):
 
 if __name__ == "__main__":
     np.random.seed(43)
-    n = 30
-    m = 3
-    p = 100
-    A = (np.random.rand(p, n) > 0.5).astype(np.int32)
-    problem = Problem(
-        n=n,
-        m=m,
-        p=p,
-        C=np.array([A.sum(axis=0).max() + 2] * m, dtype=np.int32),
-        A=A,
-        S=3,
-        s=1,
-        lambda1=0.2,
-        lambda2=0.2,
-        lambda3=0.6,
-    )
+    ns = []
+    result1 = []
+    result2 = []
+    for n in np.arange(20, 101, 10):
+        ns.append(int(n))
+        n = int(n)
+        m = 3
+        p = 100
+        A = (np.random.rand(p, n) > 0.5).astype(np.int32)
+        problem = Problem(
+            n=n,
+            m=m,
+            p=p,
+            C=np.array([A.sum(axis=0).max() + 2] * m, dtype=np.int32),
+            A=A,
+            S=3,
+            s=1,
+            lambda1=0.2,
+            lambda2=0.2,
+            lambda3=0.6,
+        )
 
-    # Survey
-    ga_survey_instance = GGA(
-        num_generations=ggaparameters.Gs,
-        num_parents_mating=ggaparameters.Ps,
-        fitness_func=fitness_func,
-        sol_per_pop=ggaparameters.Ps,
-        num_genes=problem.n * 2,
-        init_range_low=0,
-        init_range_high=1,
-        keep_parents=0,
-        mutation_percent_genes=ggaparameters.Pm * 100,
-        save_best_solutions=False,
-    )
-    ga_survey_instance.gga_run()
+        # Survey
+        ga_survey_instance = GGA(
+            num_generations=ggaparameters.Gs,
+            num_parents_mating=ggaparameters.Ps,
+            fitness_func=fitness_func,
+            sol_per_pop=ggaparameters.Ps,
+            num_genes=problem.n * 2,
+            init_range_low=0,
+            init_range_high=1,
+            keep_parents=0,
+            mutation_percent_genes=ggaparameters.Pm * 100,
+            save_best_solutions=False,
+        )
+        ga_survey_instance.gga_run()
 
-    # select best Pe from survey result
-    Pe = ggaparameters.Pe
-    survey_pop = ga_survey_instance.population
-    survey_fit = ga_survey_instance.last_generation_fitness
-    init_pop = survey_pop[survey_fit.argsort()[::-1][:Pe]]
+        # select best Pe from survey result
+        Pe = ggaparameters.Pe
+        survey_pop = ga_survey_instance.population
+        survey_fit = ga_survey_instance.last_generation_fitness
+        init_pop = survey_pop[survey_fit.argsort()[::-1][:Pe]]
 
-    import matplotlib.pyplot as plt
-    fig = plt.figure()
-    for Ge in np.arange(20, 201, 20):
-        ggaparameters.Ge = int(Ge)
-        ggaparameters.alpha = 0.4
         ga_instance = GGA(
             num_generations=ggaparameters.Ge,
             num_parents_mating=ggaparameters.Pe,
             fitness_func=fitness_func,
             initial_population=init_pop,
             num_genes=problem.n * 2,
+            init_range_low=0,
+            init_range_high=1,
             keep_parents=1,
             mutation_percent_genes=ggaparameters.Pm * 100,
-            save_best_solutions=False,
+            save_best_solutions=True,
         )
         ga_instance.gga_run()
-        plt.plot(ga_instance.best_solutions_fitness, label='$G_e=%d$' % Ge)
 
+
+        best_sol_genid = ga_instance.best_solution_generation
+        best_gene = ga_instance.best_solutions[best_sol_genid]
+        solution = Solution.decode(problem, best_gene)
+        print(solution.f3)
+        print(solution.QI)
+        result1.append(solution.QI)
+
+        # Native GA
+        ga_native = GGA(
+            num_generations=ggaparameters.Gs + ggaparameters.Ge,
+            num_parents_mating=ggaparameters.Pe,
+            fitness_func=fitness_func,
+            sol_per_pop=ggaparameters.Pe,
+            num_genes=problem.n * 2,
+            init_range_low=0,
+            init_range_high=1,
+            keep_parents=0,
+            crossover_type="single_point",
+            crossover_probability=ggaparameters.Pc,
+            mutation_type="random",
+            mutation_probability=ggaparameters.Pm,
+            parent_selection_type="rws",
+            mutation_percent_genes=ggaparameters.Pm * 100,
+            save_best_solutions=True,
+        )
+
+        ga_native.run()
+        best_sol_genid = ga_native.best_solution_generation
+        best_gene = ga_native.best_solutions[best_sol_genid]
+        solution = Solution.decode(problem, best_gene)
+        # ga_native.plot_result()
+        print(solution.f3)
+        print(solution.QI)
+        result2.append(solution.QI)
+    print(ns)
+    print(result1)
+    print(result2)
+
+    import matplotlib.pyplot as plt
+    fig = plt.figure()
+    plt.plot(ns, result1, label='GGA')
+    plt.plot(ns, result2, label='GA')
     plt.legend()
-    plt.title("$n=%d$ Iteration vs. Fitness" % problem.n)
-    plt.xlabel("Generation")
-    plt.ylabel("Fitness")
+    plt.xlabel("n (Problem Size)")
+    plt.ylabel("QI")
+    plt.title("Problem Size vs. QI")
     plt.show()
+
+    """
+    ns = [20, 30, 40, 50, 60, 70, 80, 90, 100]
+    result1 = [0.5784418356456776, 0.6007246376811595, 0.6108764519535375, 0.5783284334313314, 0.5632104719255943, 0.569472764346053, 0.4573074908328968, 0.4506912442396313, 0.47843693055274344]
+    result2 = [0.5400213447171824, 0.5702898550724638, 0.5966209081309398, 0.5543889122217556, 0.5301412332070272, 0.515292746868628, 0.43452069146149813, 0.4368663594470046, 0.46385908078558413]
+    """

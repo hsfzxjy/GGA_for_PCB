@@ -56,6 +56,12 @@ class GGA(pygad.GA):
     See comments in class Solution definition for details of its members.
     """
 
+    def __init__(self, *args, **kwargs):
+        self.gga_crossover_type = kwargs.get("gga_crossover_type")
+        if kwargs.get("gga_crossover_type"): del kwargs["gga_crossover_type"]
+        return super().__init__(*args, **kwargs)
+
+
     def gga_atc_crossover(self, parent: np.ndarray):
         """
         Asexual transposition crossover (ATC) for binary sequence crossover
@@ -146,24 +152,27 @@ class GGA(pygad.GA):
         return offspring
 
 
-    def gga_crossover(self, parents: np.ndarray, offspring_size: Tuple[int, int]):
-        # parent1, parent2 = map(lambda gene: Solution.decode(problem, gene), parents)
-        # num_offspring = offspring_size[0]
+    def gga_crossover(self, parents: np.ndarray, offspring_size: Tuple[int, int], enable_atc=False, enable_wrc=True):
+        assert enable_atc or enable_wrc
         parents = list(map(lambda gene: Solution.decode(problem, gene), parents))
 
         offsprings = []
 
         for i in range(len(parents))[::2]:
             p1, p2 = parents[i], parents[i+1]
-            # if np.random.rand() < ggaparameters.Pc:
-            #     offsprings.append(self.gga_atc_crossover(p1))
-            # if len(offsprings) >= offspring_size[0]: break
-            # if np.random.rand() < ggaparameters.Pc:
-            #     offsprings.append(self.gga_atc_crossover(p2))
-            # if len(offsprings) >= offspring_size[0]: break
-            if np.random.rand() < ggaparameters.Pc:
-                offsprings.append(self.gga_wrc_crossover(p1, p2))
-            if len(offsprings) >= offspring_size[0]: break
+
+            if enable_wrc:
+                if np.random.rand() < ggaparameters.Pc:
+                    offsprings.append(self.gga_wrc_crossover(p1, p2))
+                if len(offsprings) >= offspring_size[0]: break
+
+            if enable_atc:
+                if np.random.rand() < ggaparameters.Pc:
+                    offsprings.append(self.gga_atc_crossover(p1))
+                if len(offsprings) >= offspring_size[0]: break
+                if np.random.rand() < ggaparameters.Pc:
+                    offsprings.append(self.gga_atc_crossover(p2))
+                if len(offsprings) >= offspring_size[0]: break
 
         offsprings = np.stack([x.encode() for x in offsprings], axis=0)
         return offsprings
@@ -203,8 +212,14 @@ class GGA(pygad.GA):
         import numpy
 
         self.mutation = self.gga_mutation
+        if self.gga_crossover_type == "atc":
+            self.crossover = functools.partial(self.gga_crossover, enable_atc=True, enable_wrc=False)
+        if self.gga_crossover_type == "atc_wrc":
+            self.crossover = functools.partial(self.gga_crossover, enable_atc=True, enable_wrc=True)
+
         if self.crossover is None:
             self.crossover = self.gga_crossover
+
         self.select_parents = self.roulette_wheel_selection
 
         # GGA: survive_ratio = \alpha when not in SURVEY stage
@@ -350,7 +365,7 @@ if __name__ == "__main__":
             keep_parents=0,
             mutation_percent_genes=ggaparameters.Pm * 100,
             save_best_solutions=True,
-            crossover_type="single_point"
+            gga_crossover_type="atc"
         )
         ga_spc.gga_run()
 
@@ -373,7 +388,7 @@ if __name__ == "__main__":
             keep_parents=0,
             mutation_percent_genes=ggaparameters.Pm * 100,
             save_best_solutions=True,
-            crossover_type="two_points"
+            gga_crossover_type="atc_wrc"
         )
         ga_mpc.gga_run()
 
@@ -391,8 +406,8 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     fig = plt.figure()
     plt.plot(ns, result1, label='GGA (WRC)')
-    plt.plot(ns, result2, label='GGA (SPC)')
-    plt.plot(ns, result3, label='GGA (TPC)')
+    plt.plot(ns, result2, label='GGA (ATC)')
+    plt.plot(ns, result3, label='GGA (WRC & ATC)')
     plt.legend()
     plt.xlabel("n (Problem Size)")
     plt.ylabel("QI")
@@ -400,8 +415,15 @@ if __name__ == "__main__":
     plt.show()
 
     """
-    [20, 30, 40, 50, 60, 70, 80, 90, 100]
-    [0.5720384204909285, 0.6015569709837226, 0.6253203485392107, 0.6197654941373535, 0.537037037037037, 0.4680534918276374, 0.45876946642838906, 0.46241830065359474, 0.5589198036006546]
-    [0.5112059765208111, 0.6036801132342534, 0.5545873910814967, 0.5871021775544389, 0.4919636617749825, 0.4101040118870728, 0.4204748532039826, 0.39309056956115773, 0.5147299509001637]
-    [0.5112059765208111, 0.5739561217268224, 0.5607380830343414, 0.5921273031825797, 0.4825296995108316, 0.4404160475482912, 0.4235384222619351, 0.4140989729225023, 0.49018003273322425]
+    ns = [20, 30, 40, 50, 60, 70, 80, 90, 100]
+    # WRC
+    r1 = [0.5720384204909285, 0.6015569709837226, 0.6253203485392107, 0.6197654941373535, 0.537037037037037, 0.4680534918276374, 0.45876946642838906, 0.46241830065359474, 0.5589198036006546]
+    # SPC
+    r2 = [0.5112059765208111, 0.6036801132342534, 0.5545873910814967, 0.5871021775544389, 0.4919636617749825, 0.4101040118870728, 0.4204748532039826, 0.39309056956115773, 0.5147299509001637]
+    # TPC
+    r3 = [0.5112059765208111, 0.5739561217268224, 0.5607380830343414, 0.5921273031825797, 0.4825296995108316, 0.4404160475482912, 0.4235384222619351, 0.4140989729225023, 0.49018003273322425]
+    # ATC
+    r4 = [0.5464247598719317, 0.5687679083094556, 0.5606936416184971, 0.5586497890295359, 0.45217689406924927, 0.512396694214876, 0.4394771241830065, 0.502667852378835, 0.49635332252836306]
+    # ATC & WRC
+    r5 = [0.5464247598719317, 0.6010028653295129, 0.5606936416184971, 0.5358649789029536, 0.5241686664381214, 0.5380755608028335, 0.4394771241830065, 0.5046687416629613, 0.49817666126418153]
     """
